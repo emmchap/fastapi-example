@@ -39,7 +39,7 @@ output = run([
     "docker",
     "build",
     "-t",
-    f"job_runner:{basename(job_dir)}",
+    f"job_runner:{job_id}",
     "."
 ], capture_output=True)
 if output.returncode > 0:
@@ -54,7 +54,7 @@ output = run([
     "--json",
     "--severity",
     "high",
-    f"job_runner:{basename(job_dir)}"
+    f"job_runner:{job_id}"
 ], capture_output=True)
 if output.returncode > 0:
     if len(output.stderr) > 0:
@@ -71,18 +71,33 @@ output_file = f"{job_dir}/perf.json"
 Path(output_file).touch()
 output = run([
     "docker",
+    "network",
+    "create",
+    job_id
+], capture_output=True)
+if output.returncode > 0:
+    log(
+        f"got this error while creating the docker network: {str(output.stderr)}")
+    update_job("FAILED")
+log("Create isolated network")
+
+log("Launching the job")
+output = run([
+    "docker",
     "run",
-    "--rm",
     "-v",
     f"{job_dir}/perf.json:/data/perf.json",
     "--user",
     f"{getuid()}",
-    f"job_runner:{basename(job_dir)}"
+    "--network",
+    job_id,
+    "--memory",
+    "500M",
+    "--cpus",
+    "0.8",
+    "--read-only",
+    f"job_runner:{job_id}"
 ], capture_output=True)
-if output.returncode > 0:
-    log(f"got this error while running the docker image: {str(output.stderr)}")
-    update_job("FAILED")
-
 try:
     with open(output_file) as finput:
         job_result = load(finput)
@@ -91,6 +106,18 @@ except (JSONDecodeError, KeyError) as error:
     log(f"got this error while fetching the results: {str(error.args)}")
     update_job("FAILED", raise_error=False)
     raise ValueError("Failed job") from error
+log("Got the job results")
 
+output = run([
+    "docker",
+    "network",
+    "rm",
+    job_id
+], capture_output=True)
+if output.returncode > 0:
+    log(
+        f"got this error while removing the docker network: {str(output.stderr)}")
+    update_job("FAILED")
+log("Removed the isolated network")
 
 log("Finished job")

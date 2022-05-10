@@ -29,7 +29,8 @@ logged_in = run([
     f"{getenv('SNYK_TOKEN')}"
 ], capture_output=True)
 if logged_in.returncode > 0:
-    raise ValueError("Could not authenticate to snyk for docker image scanning")
+    raise ValueError(
+        "Could not authenticate to snyk for docker image scanning")
 
 
 app = FastAPI()
