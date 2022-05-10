@@ -3,10 +3,10 @@
 from os import chdir, getuid
 from os.path import dirname, basename
 from pathlib import Path
-from json import load
+from json import load, JSONDecodeError
 from subprocess import run
 from datetime import datetime
-from requests import JSONDecodeError, Session  # type: ignore
+from requests import Session  # type: ignore
 
 JOB_DIR = dirname(__file__)
 JOB_ID = basename(JOB_DIR)
