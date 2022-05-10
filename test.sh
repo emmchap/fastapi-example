@@ -1,0 +1,2 @@
+pylint app
+mypy app

@@ -8,7 +8,6 @@ from uuid import uuid4
 from typing import List
 from enum import Enum
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
-from sqlalchemy import create_engine
 from sqlalchemy import create_engine  # type: ignore
 from sqlalchemy.ext.declarative import declarative_base  # type: ignore
 from sqlalchemy.orm import sessionmaker, Session  # type: ignore
@@ -20,7 +19,7 @@ from sqlalchemy import (  # type: ignore
 from pydantic import BaseModel, Field  # pylint: disable=no-name-in-module
 
 
-logged_in = run([
+logged_in = run([  # pylint: disable=subprocess-run-check
     "docker",
     "scan",
     "--accept-license",
@@ -50,7 +49,8 @@ def db_session():
         db_sess.close()
 
 
-class ModelJob(base):  # type: ignore
+class ModelJob(  # pylint: disable=too-few-public-methods
+        base):  # type: ignore
     """The job model class."""
     __tablename__ = "jobs"
     id = Column(String, default=uuid4, primary_key=True)
@@ -59,6 +59,7 @@ class ModelJob(base):  # type: ignore
 
 
 class JobStatus(str, Enum):
+    """The job status enum schema."""
     INIT = "INIT"
     RUNNING = "RUNNING"
     FAILED = "FAILED"
@@ -136,7 +137,8 @@ def start_job(
     with open(f"{job_dir}/Dockerfile", "wb") as foutput:
         foutput.write(content)
     copy(f"{dirname(__file__)}/job.py", job_dir)
-    Popen(["python", f"{job_dir}/job.py"])
+    Popen(["python", f"{job_dir}/job.py"]  # pylint: disable=consider-using-with
+          )
     return new_job
 
 

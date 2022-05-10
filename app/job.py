@@ -8,21 +8,22 @@ from subprocess import run
 from datetime import datetime
 from requests import JSONDecodeError, Session  # type: ignore
 
-job_dir = dirname(__file__)
-job_id = basename(job_dir)
-chdir(job_dir)
+JOB_DIR = dirname(__file__)
+JOB_ID = basename(JOB_DIR)
+chdir(JOB_DIR)
 session = Session()
-base_url = "http://localhost:8080"
+BASE_URL = "http://localhost:8080"
 
 
 def log(message: str):
     """Logs a message in the stdout."""
-    print(f"{datetime.now()} - {job_id.split('-')[0]}: {message}")
+    print(f"{datetime.now()} - {JOB_ID.split('-')[0]}: {message}")
 
 
 def update_job(status: str, result: float | None = None, raise_error: bool = True):
-    update = session.post(f"{base_url}/job/update", json={
-        "id": job_id,
+    """Updates a job status."""
+    update = session.post(f"{BASE_URL}/job/update", json={
+        "id": JOB_ID,
         "status": status,
         "result": result
     })
@@ -35,11 +36,11 @@ update_job("RUNNING")
 log("Created job directory")
 
 
-output = run([
+output = run([  # pylint: disable=subprocess-run-check
     "docker",
     "build",
     "-t",
-    f"job_runner:{job_id}",
+    f"job_runner:{JOB_ID}",
     "."
 ], capture_output=True)
 if output.returncode > 0:
@@ -47,14 +48,14 @@ if output.returncode > 0:
     update_job("FAILED")
 log("Image built")
 
-output = run([
+output = run([  # pylint: disable=subprocess-run-check
     "docker",
     "scan",
     "--accept-license",
     "--json",
     "--severity",
     "high",
-    f"job_runner:{job_id}"
+    f"job_runner:{JOB_ID}"
 ], capture_output=True)
 if output.returncode > 0:
     if len(output.stderr) > 0:
@@ -67,13 +68,13 @@ if output.returncode > 0:
 
 log("Scanned image")
 
-output_file = f"{job_dir}/perf.json"
+output_file = f"{JOB_DIR}/perf.json"
 Path(output_file).touch()
-output = run([
+output = run([  # pylint: disable=subprocess-run-check
     "docker",
     "network",
     "create",
-    job_id
+    JOB_ID
 ], capture_output=True)
 if output.returncode > 0:
     log(
@@ -82,24 +83,24 @@ if output.returncode > 0:
 log("Create isolated network")
 
 log("Launching the job")
-output = run([
+output = run([  # pylint: disable=subprocess-run-check
     "docker",
     "run",
     "-v",
-    f"{job_dir}/perf.json:/data/perf.json",
+    f"{JOB_DIR}/perf.json:/data/perf.json",
     "--user",
     f"{getuid()}",
     "--network",
-    job_id,
+    JOB_ID,
     "--memory",
     "500M",
     "--cpus",
     "0.8",
     "--read-only",
-    f"job_runner:{job_id}"
+    f"job_runner:{JOB_ID}"
 ], capture_output=True)
 try:
-    with open(output_file) as finput:
+    with open(output_file, encoding="utf-8") as finput:
         job_result = load(finput)
     update_job("FINISHED", job_result["perf"])
 except (JSONDecodeError, KeyError) as error:
@@ -108,11 +109,11 @@ except (JSONDecodeError, KeyError) as error:
     raise ValueError("Failed job") from error
 log("Got the job results")
 
-output = run([
+output = run([  # pylint: disable=subprocess-run-check
     "docker",
     "network",
     "rm",
-    job_id
+    JOB_ID
 ], capture_output=True)
 if output.returncode > 0:
     log(
