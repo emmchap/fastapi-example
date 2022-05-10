@@ -7,6 +7,8 @@ name = "pypi"
 fastapi = "*"
 uvicorn = "*"
 sqlalchemy = "*"
+python-multipart = "*"
+requests = "*"
 
 [dev-packages]
 pylint = "*"

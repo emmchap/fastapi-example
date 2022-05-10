@@ -1,10 +1,13 @@
 """The main application script."""
 
-from os import getcwd
+from os import getcwd, makedirs, getenv
+from os.path import dirname
+from shutil import rmtree, copy
+from subprocess import Popen, run
 from uuid import uuid4
 from typing import List
 from enum import Enum
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy import create_engine
 from sqlalchemy import create_engine  # type: ignore
 from sqlalchemy.ext.declarative import declarative_base  # type: ignore
@@ -15,6 +18,18 @@ from sqlalchemy import (  # type: ignore
     Float
 )
 from pydantic import BaseModel, Field  # pylint: disable=no-name-in-module
+
+
+logged_in = run([
+    "docker",
+    "scan",
+    "--accept-license",
+    "--login",
+    "--token",
+    f"{getenv('SNYK_TOKEN')}"
+], capture_output=True)
+if logged_in.returncode > 0:
+    raise ValueError("Could not authenticate to snyk for docker image scanning")
 
 
 app = FastAPI()
@@ -53,7 +68,7 @@ class SchemaJob(BaseModel):  # pylint: disable=too-few-public-methods
     """The job schema class."""
     id: str = Field(uuid4(), description="The job ID.")
     status: JobStatus = Field(JobStatus.INIT, description="The job status.")
-    result: float | None = Field(..., description="The job results.")
+    result: float | None = Field(None, description="The job results.")
 
     class Config:  # pylint: disable=too-few-public-methods
         """Specific configuration."""
@@ -68,6 +83,8 @@ class NotFound(BaseModel):  # pylint: disable=too-few-public-methods
 
 ModelJob.metadata.drop_all(bind=engine)
 ModelJob.metadata.create_all(bind=engine)
+JOB_DIR = f"{getcwd()}/jobs"
+rmtree(JOB_DIR, ignore_errors=True)
 
 
 @app.get(
@@ -104,11 +121,21 @@ def get_job_ids(database: Session = Depends(db_session)):
     response_model=SchemaJob,
     response_description="The job details."
 )
-def start_job(database: Session = Depends(db_session)):
+def start_job(
+    dockerfile: UploadFile = File(..., description="The Dockerfile to use"),
+    database: Session = Depends(db_session)
+):
     """Allows to start a job."""
     new_job = ModelJob(id=str(uuid4()))
     database.add(new_job)
     database.commit()
+    job_dir = f"{JOB_DIR}/{new_job.id}"
+    makedirs(job_dir)
+    content = dockerfile.file.read()
+    with open(f"{job_dir}/Dockerfile", "wb") as foutput:
+        foutput.write(content)
+    copy(f"{dirname(__file__)}/job.py", job_dir)
+    Popen(["python", f"{job_dir}/job.py"])
     return new_job
 
 
