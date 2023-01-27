@@ -1,8 +1,8 @@
-# Owkin techical test
+# FastAPI example
 
 ## Introduction
 
-This project was created in order to answer to a techical test for Owkin.
+This project was created in order to answer to a techical test.
 
 This application uses these python modules:
 * FastAPI (with Uvicorn)
